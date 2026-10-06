@@ -106,6 +106,10 @@ distsysBankS/
 ├── benchmark_results.json                     # Measured benchmark JSON
 ├── scripts/
 │   ├── start-servers.bat / .sh                # Launch Gateway & 3 Bank Servers
+│   ├── start-server1.bat                      # Launch BankServer 1 (Port 8001, A1xx)
+│   ├── start-server2.bat                      # Launch BankServer 2 (Port 8002, A2xx)
+│   ├── start-server3.bat                      # Launch BankServer 3 (Port 8003, A3xx)
+│   ├── start-gateway.bat                      # Launch BankGateway (Port 8000)
 │   ├── run-client.bat / .sh                   # Launch interactive CLI client
 │   ├── run-benchmark.bat / .sh                # Launch performance benchmark
 │   └── run-benchmark-suite.ps1                # Automated PowerShell benchmark suite
@@ -169,11 +173,20 @@ Expected output:
 #### Step 1: Start the Servers
 Open a terminal in the project root:
 
-**On Windows:**
+**On Windows (All servers simultaneously):**
 ```cmd
 scripts\start-servers.bat
 ```
 *(This opens 4 console windows: Server 1 on 8001, Server 2 on 8002, Server 3 on 8003, and Gateway on 8000).*
+
+**On Windows (Individual processes):**
+Each distributed process can also be started independently in its own window (either from the project root in `cmd` or by double-clicking the script from Windows Explorer):
+- `scripts\start-server1.bat` &mdash; Starts BankServer 1 on port 8001 (partition `A1xx`)
+- `scripts\start-server2.bat` &mdash; Starts BankServer 2 on port 8002 (partition `A2xx`)
+- `scripts\start-server3.bat` &mdash; Starts BankServer 3 on port 8003 (partition `A3xx`)
+- `scripts\start-gateway.bat` &mdash; Starts BankGateway coordinator on port 8000
+
+*(Note: These startup scripts only start or restart the standalone Java process; the application maintains in-memory account state and does not implement automatic post-restart state recovery or reconciliation).*
 
 **On Linux / macOS:**
 ```bash
