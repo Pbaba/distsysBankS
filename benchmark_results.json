@@ -1,0 +1,122 @@
+[
+  {
+    "mode": "sequential",
+    "requests": 10,
+    "concurrency": 1,
+    "totalTimeMs": 124.26,
+    "avgLatencyMs": 11.90,
+    "p50Ms": 9.00,
+    "p95Ms": 64.00,
+    "throughputTps": 80.47,
+    "successful": 10,
+    "failed": 0
+  },
+  {
+    "mode": "sequential",
+    "requests": 50,
+    "concurrency": 1,
+    "totalTimeMs": 226.70,
+    "avgLatencyMs": 4.02,
+    "p50Ms": 2.00,
+    "p95Ms": 9.00,
+    "throughputTps": 220.56,
+    "successful": 50,
+    "failed": 0
+  },
+  {
+    "mode": "sequential",
+    "requests": 100,
+    "concurrency": 1,
+    "totalTimeMs": 390.97,
+    "avgLatencyMs": 3.37,
+    "p50Ms": 2.00,
+    "p95Ms": 7.00,
+    "throughputTps": 255.78,
+    "successful": 100,
+    "failed": 0
+  },
+  {
+    "mode": "sequential",
+    "requests": 500,
+    "concurrency": 1,
+    "totalTimeMs": 1659.97,
+    "avgLatencyMs": 2.83,
+    "p50Ms": 1.00,
+    "p95Ms": 7.00,
+    "throughputTps": 301.21,
+    "successful": 500,
+    "failed": 0
+  },
+  {
+    "mode": "sequential",
+    "requests": 1000,
+    "concurrency": 1,
+    "totalTimeMs": 3025.52,
+    "avgLatencyMs": 2.53,
+    "p50Ms": 1.00,
+    "p95Ms": 7.00,
+    "throughputTps": 330.52,
+    "successful": 1000,
+    "failed": 0
+  },
+  {
+    "mode": "concurrent",
+    "requests": 10,
+    "concurrency": 2,
+    "totalTimeMs": 23.20,
+    "avgLatencyMs": 3.40,
+    "p50Ms": 2.00,
+    "p95Ms": 6.00,
+    "throughputTps": 431.01,
+    "successful": 10,
+    "failed": 0
+  },
+  {
+    "mode": "concurrent",
+    "requests": 50,
+    "concurrency": 10,
+    "totalTimeMs": 38.42,
+    "avgLatencyMs": 6.26,
+    "p50Ms": 4.00,
+    "p95Ms": 13.00,
+    "throughputTps": 1301.25,
+    "successful": 50,
+    "failed": 0
+  },
+  {
+    "mode": "concurrent",
+    "requests": 100,
+    "concurrency": 20,
+    "totalTimeMs": 88.50,
+    "avgLatencyMs": 13.69,
+    "p50Ms": 10.00,
+    "p95Ms": 25.00,
+    "throughputTps": 1129.96,
+    "successful": 100,
+    "failed": 0
+  },
+  {
+    "mode": "concurrent",
+    "requests": 500,
+    "concurrency": 20,
+    "totalTimeMs": 464.92,
+    "avgLatencyMs": 16.82,
+    "p50Ms": 12.00,
+    "p95Ms": 34.00,
+    "throughputTps": 1075.45,
+    "successful": 500,
+    "failed": 0
+  },
+  {
+    "mode": "concurrent",
+    "requests": 1000,
+    "concurrency": 20,
+    "totalTimeMs": 854.88,
+    "avgLatencyMs": 16.49,
+    "p50Ms": 14.00,
+    "p95Ms": 36.00,
+    "throughputTps": 1169.75,
+    "successful": 1000,
+    "failed": 0
+  }
+]
