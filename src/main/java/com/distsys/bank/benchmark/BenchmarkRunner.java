@@ -12,7 +12,13 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Benchmark harness comparing sequential vs concurrent workloads.
+ * Benchmark harness comparing sequential vs concurrent execution of a mixed banking workload.
+ * Workload composition per 5 operations:
+ * - 20% BALANCE (read query)
+ * - 20% DEPOSIT (localized write)
+ * - 20% WITHDRAW (localized write)
+ * - 40% TRANSFER (cross-server Two-Phase Commit: 20% A101->A201, 20% A201->A101)
+ *
  * Measures real execution metrics (no fabricated results) and outputs raw CSV and JSON.
  * Satisfies Section 8 of the assignment specification.
  */

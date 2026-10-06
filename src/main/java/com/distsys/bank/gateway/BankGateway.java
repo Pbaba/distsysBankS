@@ -129,7 +129,7 @@ public class BankGateway implements Runnable {
                     if (parts.length < 2) return "FAILED: Usage: BALANCE <accId>";
                     String accId = parts[1];
                     RoutingTable.ServerEndpoint ep = routingTable.getEndpointForAccount(accId);
-                    if (ep == null) return "FAILED: Destination account not found";
+                    if (ep == null) return "FAILED: Account not found";
 
                     String rpcResp = coordinator2PC.sendRpc(ep, "BALANCE " + accId, Constants.SOCKET_TIMEOUT_MS);
                     if (rpcResp != null && rpcResp.startsWith("OK")) {
@@ -147,7 +147,7 @@ public class BankGateway implements Runnable {
                     long paise = CurrencyFormatter.parsePaise(parts[2]);
 
                     RoutingTable.ServerEndpoint ep = routingTable.getEndpointForAccount(accId);
-                    if (ep == null) return "FAILED: Destination account not found";
+                    if (ep == null) return "FAILED: Account not found";
 
                     String rpcResp = coordinator2PC.sendRpc(ep, "DEPOSIT " + accId + " " + paise, Constants.SOCKET_TIMEOUT_MS);
                     if (rpcResp != null && rpcResp.startsWith("OK")) {
@@ -165,7 +165,7 @@ public class BankGateway implements Runnable {
                     long paise = CurrencyFormatter.parsePaise(parts[2]);
 
                     RoutingTable.ServerEndpoint ep = routingTable.getEndpointForAccount(accId);
-                    if (ep == null) return "FAILED: Destination account not found";
+                    if (ep == null) return "FAILED: Account not found";
 
                     String rpcResp = coordinator2PC.sendRpc(ep, "WITHDRAW " + accId + " " + paise, Constants.SOCKET_TIMEOUT_MS);
                     if (rpcResp != null && rpcResp.startsWith("OK")) {

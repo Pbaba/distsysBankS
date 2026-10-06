@@ -58,13 +58,54 @@ public class Account {
         }
     }
 
-    public long deposit(long amountPaise) {
+    /**
+     * Internal deposit without acquiring lock. Caller must hold this account's lock.
+     */
+    public void internalDeposit(long amountPaise) {
         if (amountPaise <= 0) {
             throw new IllegalArgumentException("Deposit amount must be positive");
         }
+        balance += amountPaise;
+    }
+
+    /**
+     * Internal withdraw without acquiring lock. Caller must hold this account's lock.
+     */
+    public void internalWithdraw(long amountPaise) {
+        if (amountPaise <= 0) {
+            throw new IllegalArgumentException("Withdrawal amount must be positive");
+        }
+        if ((balance - reservedDebits) < amountPaise) {
+            throw new IllegalStateException("Insufficient funds");
+        }
+        balance -= amountPaise;
+    }
+
+    /**
+     * Internal reservation without acquiring lock. Caller must hold this account's lock.
+     */
+    public boolean internalReserveDebit(long amountPaise) {
+        if (amountPaise <= 0) {
+            throw new IllegalArgumentException("Reserve amount must be positive");
+        }
+        if ((balance - reservedDebits) < amountPaise) {
+            return false;
+        }
+        reservedDebits += amountPaise;
+        return true;
+    }
+
+    /**
+     * Internal release reservation without acquiring lock. Caller must hold this account's lock.
+     */
+    public void internalReleaseReservation(long amountPaise) {
+        reservedDebits = Math.max(0L, reservedDebits - amountPaise);
+    }
+
+    public long deposit(long amountPaise) {
         lock.lock();
         try {
-            balance += amountPaise;
+            internalDeposit(amountPaise);
             return balance;
         } finally {
             lock.unlock();
@@ -72,15 +113,9 @@ public class Account {
     }
 
     public long withdraw(long amountPaise) {
-        if (amountPaise <= 0) {
-            throw new IllegalArgumentException("Withdrawal amount must be positive");
-        }
         lock.lock();
         try {
-            if ((balance - reservedDebits) < amountPaise) {
-                throw new IllegalStateException("Insufficient funds");
-            }
-            balance -= amountPaise;
+            internalWithdraw(amountPaise);
             return balance;
         } finally {
             lock.unlock();
@@ -93,11 +128,7 @@ public class Account {
     public boolean reserveDebit(long amountPaise) {
         lock.lock();
         try {
-            if ((balance - reservedDebits) < amountPaise) {
-                return false;
-            }
-            reservedDebits += amountPaise;
-            return true;
+            return internalReserveDebit(amountPaise);
         } finally {
             lock.unlock();
         }
@@ -109,7 +140,7 @@ public class Account {
     public void releaseReservation(long amountPaise) {
         lock.lock();
         try {
-            reservedDebits = Math.max(0L, reservedDebits - amountPaise);
+            internalReleaseReservation(amountPaise);
         } finally {
             lock.unlock();
         }
@@ -134,7 +165,7 @@ public class Account {
     public void commitCredit(long amountPaise) {
         lock.lock();
         try {
-            balance += amountPaise;
+            internalDeposit(amountPaise);
         } finally {
             lock.unlock();
         }

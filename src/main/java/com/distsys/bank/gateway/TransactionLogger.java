@@ -64,7 +64,9 @@ public class TransactionLogger {
                         if ("SUCCESS".equalsIgnoreCase(record.status())) {
                             decisions.put(record.transactionId(), "COMMIT");
                         } else {
-                            decisions.put(record.transactionId(), "ABORT");
+                            // If a DECISION: COMMIT was already recorded earlier in the log,
+                            // do NOT overwrite it with ABORT. A COMMIT decision is irrevocable.
+                            decisions.putIfAbsent(record.transactionId(), "ABORT");
                         }
                     } catch (Exception ignored) {}
                 }

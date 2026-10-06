@@ -1,6 +1,7 @@
 package com.distsys.bank;
 
 import com.distsys.bank.client.BankClient;
+import com.distsys.bank.common.CurrencyFormatter;
 import com.distsys.bank.gateway.BankGateway;
 import com.distsys.bank.gateway.RoutingTable;
 import com.distsys.bank.gateway.TransactionLogger;
@@ -112,13 +113,15 @@ public class ConcurrencyEdgeTests {
         assertTrue(completed, "Bidirectional concurrent transfers must not deadlock");
 
         // Verify total conservation of money:
-        // Initial sum was 50,000 + 50,000 = 100,000.
-        // Final sum must be exactly 100,000.
+        // Initial sum was 50,000 + 50,000 = 100,000 (10,000,000 paise).
+        // Final sum must be exactly 10,000,000 paise.
         String balA101Str = client.executeCommand("BALANCE A101").replace("SUCCESS: A101 balance = ", "");
         String balA201Str = client.executeCommand("BALANCE A201").replace("SUCCESS: A201 balance = ", "");
 
-        double total = Double.parseDouble(balA101Str) + Double.parseDouble(balA201Str);
-        assertEquals(100000.0, total, 0.001, "Total money across distributed servers must be conserved");
+        long balA101Paise = CurrencyFormatter.parsePaise(balA101Str);
+        long balA201Paise = CurrencyFormatter.parsePaise(balA201Str);
+        long totalPaise = balA101Paise + balA201Paise;
+        assertEquals(10000000L, totalPaise, "Total money across distributed servers must be conserved in integer paise");
     }
 
     /**
@@ -143,6 +146,9 @@ public class ConcurrencyEdgeTests {
 
         String resp3 = client.executeCommand("TRANSFER A101 A201 -50");
         assertTrue(resp3.startsWith("FAILED"), "Negative transfer must fail: " + resp3);
+
+        String resp4 = client.executeCommand("DEPOSIT A101 10.123");
+        assertTrue(resp4.startsWith("FAILED"), "Excessive decimal places must fail: " + resp4);
     }
 
     /**

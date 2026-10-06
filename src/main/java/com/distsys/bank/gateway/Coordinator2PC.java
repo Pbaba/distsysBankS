@@ -154,10 +154,12 @@ public class Coordinator2PC {
             transactionLogger.recordTransaction(TransactionRecord.success(txId, sourceAcc, destAcc, amountPaise));
             return TransferResult.success(txId, "Transferred successfully across servers");
         } else {
-            // One participant failed during commit. Invariant: DO NOT ABORT.
-            // Transaction is committed in durable coordinator log; participant reconciles upon return.
-            transactionLogger.recordTransaction(TransactionRecord.success(txId, sourceAcc, destAcc, amountPaise));
-            return TransferResult.success(txId, "Transaction COMMITTED (participant reconciliation pending)");
+            // One or both participants failed during commit. Invariant: DO NOT ABORT.
+            // Transaction decision is durably recorded as COMMIT; participant completion was not confirmed.
+            String unavailableParticipant = !srcCommitted ? srcEp.serverId() : dstEp.serverId();
+            String errMsg = "COMMIT DECIDED BUT PARTICIPANT UNAVAILABLE (" + unavailableParticipant + ")";
+            transactionLogger.recordTransaction(TransactionRecord.failure(txId, sourceAcc, destAcc, amountPaise, errMsg));
+            return TransferResult.failed(txId, errMsg);
         }
     }
 

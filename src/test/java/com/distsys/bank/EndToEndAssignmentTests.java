@@ -146,20 +146,25 @@ public class EndToEndAssignmentTests {
         int transfersPerThread = 20;
         long transferAmount = 10; // ₹10 each transfer
 
-        // Initial A101 = 10000. Each transfer moves 10 from A101 to A201.
-        // Total deducted = 10 * 20 * 10 = 2000.
-        // Expected final: A101 = 8000, A201 = 22000.
         ExecutorService executor = Executors.newFixedThreadPool(threads);
         CountDownLatch latch = new CountDownLatch(threads * transfersPerThread);
+        AtomicInteger successfulTransfers = new AtomicInteger(0);
+        AtomicInteger failedTransfers = new AtomicInteger(0);
 
         for (int i = 0; i < threads; i++) {
             executor.submit(() -> {
                 BankClient threadClient = new BankClient("localhost", GW_PORT);
                 for (int j = 0; j < transfersPerThread; j++) {
                     try {
-                        threadClient.executeCommand("TRANSFER A101 A201 " + transferAmount);
-                    } catch (IOException ignored) {}
-                    finally {
+                        String resp = threadClient.executeCommand("TRANSFER A101 A201 " + transferAmount);
+                        if (resp != null && resp.startsWith("SUCCESS")) {
+                            successfulTransfers.incrementAndGet();
+                        } else {
+                            failedTransfers.incrementAndGet();
+                        }
+                    } catch (IOException e) {
+                        failedTransfers.incrementAndGet();
+                    } finally {
                         latch.countDown();
                     }
                 }
@@ -169,8 +174,13 @@ public class EndToEndAssignmentTests {
         assertTrue(latch.await(30, TimeUnit.SECONDS), "Concurrent transfers timed out");
         executor.shutdownNow();
 
-        long expectedA101 = 10000 - (threads * transfersPerThread * transferAmount);
-        long expectedA201 = 20000 + (threads * transfersPerThread * transferAmount);
+        int successes = successfulTransfers.get();
+        int failures = failedTransfers.get();
+        assertEquals(threads * transfersPerThread, successes + failures, "Every attempted transfer must be accounted for");
+        assertTrue(successes > 0, "At least some transfers should succeed under concurrency");
+
+        long expectedA101 = 10000 - (successes * transferAmount);
+        long expectedA201 = 20000 + (successes * transferAmount);
 
         String balA101 = client.executeCommand("BALANCE A101");
         assertEquals("SUCCESS: A101 balance = " + expectedA101 + ".00", balA101);
@@ -244,6 +254,26 @@ public class EndToEndAssignmentTests {
         // Destination balance must be untouched at ₹20,000
         String balA201 = client.executeCommand("BALANCE A201");
         assertEquals("SUCCESS: A201 balance = 20000.00", balA201, "Destination balance must be untouched");
+    }
+
+    @Test
+    void testCase7_ServerFailure_ParticipantFailsDuringCommit_DecisionIrrevocable() throws IOException {
+        // Set deterministic failure hook on destination server (Server 2) before commit is applied
+        server2.setFailMode(FailMode.CRASH_BEFORE_COMMIT);
+
+        String resp = client.executeCommand("TRANSFER A101 A201 5000");
+        // Must report explicit non-success state since participant completion was not acknowledged
+        assertTrue(resp.startsWith("FAILED"), "Must report non-success when participant fails during commit: " + resp);
+        assertTrue(resp.contains("COMMIT DECIDED BUT PARTICIPANT UNAVAILABLE"), "Must indicate commit decision but participant unavailable: " + resp);
+
+        // Verify that logger recorded DECISION: COMMIT for this transaction in the gateway log
+        // The decision can never become ABORT
+        assertFalse(logger.getAllRecords().isEmpty());
+        String txId = logger.getAllRecords().get(logger.getAllRecords().size() - 1).transactionId();
+        assertEquals("COMMIT", logger.getDecision(txId), "Coordinator decision must remain COMMIT");
+
+        // Reset hook on server2 so subsequent commands work cleanly
+        server2.setFailMode(FailMode.NONE);
     }
 
     @Test

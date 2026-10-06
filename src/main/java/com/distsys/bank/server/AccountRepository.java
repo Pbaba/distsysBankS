@@ -41,25 +41,31 @@ public class AccountRepository {
         }
     }
 
-    private synchronized void appendIntent(String state, PreparedOperation op) {
+    private synchronized boolean appendIntent(String state, PreparedOperation op) {
         try {
+            if (logOutputStream == null) return false;
             String line = op.toLogLine(state) + "\n";
             logOutputStream.write(line.getBytes(StandardCharsets.UTF_8));
             logOutputStream.flush();
             logOutputStream.getFD().sync(); // Durable flush to disk
+            return true;
         } catch (IOException e) {
             System.err.println("[" + serverId + "] Failed to flush intent log: " + e.getMessage());
+            return false;
         }
     }
 
-    private synchronized void appendResolution(String state, String txId) {
+    private synchronized boolean appendResolution(String state, String txId) {
         try {
+            if (logOutputStream == null) return false;
             String line = state + "," + txId + ",,,,,\n";
             logOutputStream.write(line.getBytes(StandardCharsets.UTF_8));
             logOutputStream.flush();
             logOutputStream.getFD().sync(); // Durable flush to disk
+            return true;
         } catch (IOException e) {
             System.err.println("[" + serverId + "] Failed to flush intent resolution: " + e.getMessage());
+            return false;
         }
     }
 
@@ -100,6 +106,7 @@ public class AccountRepository {
 
     /**
      * Executes atomic intra-server transfer with total lock ordering to prevent deadlocks.
+     * Performs direct mutations under the held locks without nested public locking calls.
      */
     public void localTransfer(String srcId, String dstId, long amountPaise) {
         Account src = accounts.get(srcId);
@@ -118,11 +125,8 @@ public class AccountRepository {
         try {
             second.getLock().lock();
             try {
-                if (src.getAvailableBalance() < amountPaise) {
-                    throw new IllegalStateException("Insufficient funds");
-                }
-                src.withdraw(amountPaise);
-                dst.deposit(amountPaise);
+                src.internalWithdraw(amountPaise);
+                dst.internalDeposit(amountPaise);
             } finally {
                 second.getLock().unlock();
             }
@@ -133,26 +137,42 @@ public class AccountRepository {
 
     /**
      * 2PC PREPARE DEBIT phase: reserves funds on source account.
+     * Atomically rolls back any reservation if intent persistence fails.
      */
     public boolean prepareDebit(String txId, String accountId, long amountPaise) {
         Account acc = accounts.get(accountId);
         if (acc == null) return false;
 
         boolean locked = false;
+        boolean reserved = false;
         try {
             locked = acc.getLock().tryLock(3, TimeUnit.SECONDS);
             if (!locked) return false;
 
-            boolean reserved = acc.reserveDebit(amountPaise);
+            reserved = acc.internalReserveDebit(amountPaise);
             if (!reserved) return false;
 
             PreparedOperation op = new PreparedOperation(
                     txId, accountId, PreparedOperation.OpType.DEBIT, amountPaise, Instant.now().toString());
+            boolean logged = appendIntent("PREPARED", op);
+            if (!logged) {
+                acc.internalReleaseReservation(amountPaise);
+                reserved = false;
+                return false;
+            }
             preparedOps.put(txId, op);
-            appendIntent("PREPARED", op);
             return true;
         } catch (InterruptedException e) {
+            if (reserved) {
+                acc.internalReleaseReservation(amountPaise);
+            }
             Thread.currentThread().interrupt();
+            return false;
+        } catch (Exception e) {
+            if (reserved) {
+                acc.internalReleaseReservation(amountPaise);
+            }
+            preparedOps.remove(txId);
             return false;
         } finally {
             if (locked) {
@@ -170,8 +190,11 @@ public class AccountRepository {
 
         PreparedOperation op = new PreparedOperation(
                 txId, accountId, PreparedOperation.OpType.CREDIT, amountPaise, Instant.now().toString());
+        boolean logged = appendIntent("PREPARED", op);
+        if (!logged) {
+            return false;
+        }
         preparedOps.put(txId, op);
-        appendIntent("PREPARED", op);
         return true;
     }
 

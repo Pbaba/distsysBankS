@@ -82,12 +82,17 @@ public class BankServer implements Runnable {
                 line = line.trim();
                 if (line.isEmpty()) continue;
 
+                // Failure hook: crash before executing commit
+                if (currentFailMode == FailMode.CRASH_BEFORE_COMMIT && line.startsWith("COMMIT ")) {
+                    System.out.println("[" + serverId + "] Triggered failure hook: CRASH_BEFORE_COMMIT. Closing socket before commit.");
+                    return;
+                }
+
                 String response = processCommand(line);
 
-                // Failure hook: crash during commit
+                // Failure hook: crash after executing commit, before sending ACK (simulates lost ACK)
                 if (currentFailMode == FailMode.CRASH_DURING_COMMIT && line.startsWith("COMMIT ")) {
-                    System.out.println("[" + serverId + "] Triggered failure hook: CRASH_DURING_COMMIT. Closing socket.");
-                    currentFailMode = FailMode.NONE;
+                    System.out.println("[" + serverId + "] Triggered failure hook: CRASH_DURING_COMMIT. Closing socket after commit, before ACK.");
                     return;
                 }
 

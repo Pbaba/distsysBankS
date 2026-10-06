@@ -21,12 +21,21 @@ public final class CurrencyFormatter {
             throw new IllegalArgumentException("Amount cannot be empty");
         }
         String cleaned = amountStr.trim().replace("₹", "").replace(",", "");
-        BigDecimal decimal = new BigDecimal(cleaned);
+        BigDecimal decimal;
+        try {
+            decimal = new BigDecimal(cleaned);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid amount format: " + amountStr);
+        }
         if (decimal.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Amount must be positive: " + amountStr);
         }
-        BigDecimal inPaise = decimal.multiply(HUNDRED).setScale(0, RoundingMode.UNNECESSARY);
-        return inPaise.longValueExact();
+        try {
+            BigDecimal inPaise = decimal.multiply(HUNDRED).setScale(0, RoundingMode.UNNECESSARY);
+            return inPaise.longValueExact();
+        } catch (ArithmeticException e) {
+            throw new IllegalArgumentException("Amount must have at most 2 decimal places: " + amountStr);
+        }
     }
 
     /**

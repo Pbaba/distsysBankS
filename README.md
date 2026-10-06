@@ -74,11 +74,15 @@ Cross-server transfers (`TRANSFER A101 A201 5000`) adhere to strict coordinator-
    - When both participants vote `VOTE_COMMIT`:
      - Gateway **first** durably records `DECISION: COMMIT` to `transactions.log` and forces an `fsync()` to disk **before** sending `COMMIT` messages.
      - **Irrevocable Invariant:** The transaction can **never** become `ABORT`.
-     - Gateway sends `COMMIT` to both participants.
-     - If a participant fails/crashes during commit:
-       - The coordinator retries `COMMIT` or awaits reconnection.
-       - A recovering participant reads its pending prepared state from `server_{port}_intent.log`, queries `RECONCILE <txId>` from the Gateway, and finalizes the transaction.
-     - Client receives `SUCCESS` once commit acknowledgments are confirmed.
+     - Gateway sends `COMMIT` to both participants, retrying up to 3 times on connection drops.
+     - **Participant Completion & Failure Semantics:**
+       - If both participants acknowledge commit: Client receives `SUCCESS`.
+       - If a participant fails/crashes during commit and cannot be reached:
+         - The transaction remains **permanently committed** in the coordinator's durable decision log (never rolled back).
+         - The coordinator returns an explicit non-success state: `FAILED: COMMIT DECIDED BUT PARTICIPANT UNAVAILABLE (<Server>)`, indicating the global commit was decided but participant delivery could not be confirmed.
+         - The decision is retained for manual reconciliation or status inquiry via `RECONCILE <txId>`.
+     - **Recovery Scope & Architectural Limitation:**
+       - As an academic project with in-memory account state, automatic post-restart reconciliation from `server_{port}_intent.log` into in-memory accounts is not implemented (restarted servers initialize fresh in-memory account state). Participant crash recovery without persistent storage is inherently limited; in-memory accounts on a terminated server cannot automatically be restored.
 
 ### 2.3 Concurrency & Deadlock Freedom
 - **Thread Pool:** Fixed `ExecutorService` per server process.
@@ -229,7 +233,10 @@ All 8 test cases from the assignment specification are automated in `EndToEndAss
 
 ## 6. Real Performance Benchmark Results (Section 8)
 
-The benchmark was executed using the actual implementation via `BenchmarkRunner` against the running system. Raw data is exported to `benchmark_results.csv` and `benchmark_results.json`:
+The benchmark was executed using the actual implementation via `BenchmarkRunner` against the running system.
+**Workload Composition:** The benchmark evaluates a **mixed banking workload** (20% `BALANCE` queries, 20% `DEPOSIT`, 20% `WITHDRAW`, and 40% cross-server Two-Phase Commit `TRANSFER` operations) comparing sequential single-client execution against concurrent multi-threaded execution.
+
+Raw data is exported to `benchmark_results.csv` and `benchmark_results.json`:
 
 | Execution Mode | Workload (Requests) | Concurrency (Threads) | Total Elapsed Time (ms) | Avg Latency (ms) | Median p50 (ms) | 95th Percentile p95 (ms) | Throughput (req/sec) | Success Count | Failed Count |
 |---|---|---|---|---|---|---|---|---|---|
@@ -257,5 +264,5 @@ powershell -ExecutionPolicy Bypass -File scripts/run-benchmark-suite.ps1
 2. **Normal Operations (1:00–2:00):** Run `scripts\run-client.bat`. Demonstrate `CREATE`, `DEPOSIT`, `WITHDRAW`, `BALANCE`.
 3. **Cross-Server 2PC Transfer (2:00–3:15):** Execute `TRANSFER A101 A201 5000`. Show Gateway console displaying `PREPARE_DEBIT` $\to$ `PREPARE_CREDIT` $\to$ `DURABLE COMMIT` $\to$ participant commits.
 4. **Concurrent Transactions (3:15–4:15):** Run Test Case 6: simultaneous withdrawals of ₹7,000 on account with ₹10,000. Show one succeeds and one fails, balance = ₹3,000.
-5. **Failure Simulation & Atomicity (4:15–5:30):** Terminate Server 2 window (`Ctrl+C`). Attempt `TRANSFER A101 A201 1000`. Show transaction aborts with `Destination server unavailable`, source balance remains intact. Re-launch Server 2 and show reconciliation.
+5. **Failure Simulation & Atomicity (4:15–5:30):** Terminate Server 2 window (`Ctrl+C`). Attempt `TRANSFER A101 A201 1000`. Show transaction aborts with `Destination server unavailable`, source balance remains intact. Show that pre-decision failure leaves accounts completely untouched.
 6. **Audit & Log Verification (5:30–6:30):** Run `HISTORY A101` and view `transactions.log`. Verify all required Section 7 fields.
